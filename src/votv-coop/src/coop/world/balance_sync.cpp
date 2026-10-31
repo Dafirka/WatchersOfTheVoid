@@ -61,10 +61,21 @@ void Deliver(net::Session* s, int slot, int32_t points, uint64_t epoch, uint32_t
 }  // namespace
 
 void SetSession(coop::net::Session* session) {
+    // Called from the per-pump-tick Install fanout: the reset must happen once per session. Clearing
+    // g_delivery every tick re-sent an unchanged balance to every peer 60 times a second (the row's
+    // `sent` flag is the dedup that the reset destroyed).
+    const uint32_t serial = net::session_serial::Current();
+    static coop::net::Session* s_installedSession = nullptr;
+    static uint32_t s_installedSerial = 0;
+    if (s_installedSession == session && s_installedSerial == serial &&
+        g_session.load(std::memory_order_acquire) == session)
+        return;
+    s_installedSession = session;
+    s_installedSerial = serial;
     ++g_epoch;
     g_delivery = {};
     g_pending.store(0);
-    g_serial.store(net::session_serial::Current());
+    g_serial.store(serial);
     g_world = ue_wrap::world_identity::Generation();
     g_session.store(session, std::memory_order_release);
 }
