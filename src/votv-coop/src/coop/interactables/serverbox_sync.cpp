@@ -449,8 +449,18 @@ void DriveWatches() {
 }  // namespace
 
 void Install(coop::net::Session* session) {
+    // Install is the per-pump-tick "ensure" path, not a reset: when this session is already
+    // installed, only the watch drive (itself latched) may run. The poll cursor and the per-slot
+    // delivered rows ARE the delivery dedup -- clearing them each tick turned one unchanged box
+    // state into a reliable full-state send to every joiner 60 times a second, and made each of
+    // those rows re-apply the whole server list on the client.
+    const uint32_t serial = coop::net::session_serial::Current();
+    if (g_session.load(std::memory_order_acquire) == session && g_sessionSerial == serial) {
+        DriveWatches();
+        return;
+    }
     ++g_epoch;
-    g_sessionSerial = coop::net::session_serial::Current();
+    g_sessionSerial = serial;
     g_polledWorldGen = 0; g_polledGm = nullptr; g_polledGmSerial = 0;
     g_lastPollMs = 0;
     for (int slot = 0; slot < g_delivery.size(); ++slot) g_delivery[slot] = {};
