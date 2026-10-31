@@ -67,10 +67,12 @@ bool BindingsCurrent(){
 }
 
 bool LayoutCurrent() {
-    if(!g_resolved || !std::all_of(g_layoutRefs.begin(),g_layoutRefs.end(),[](const CachedObjRef& ref){return ref.Get()!=nullptr;}))return false;
-    if(!BindingsCurrent())return false;
-    return g_resolved && std::all_of(g_layoutRefs.begin(),g_layoutRefs.end(),
-        [](const CachedObjRef& ref){return ref.Get()!=nullptr;}) && BindingsCurrent();
+    if(!g_resolved)return false;
+    if(!std::all_of(g_layoutRefs.begin(),g_layoutRefs.end(),[](const CachedObjRef& ref){return ref.Get()!=nullptr;}))return false;
+    // ONE verification pass, not two: each BindingsCurrent re-resolves the WidgetBlueprintLibrary
+    // CDO and the four layout classes, and the second pass bought nothing the first did not --
+    // it re-read the same pointers in the same tick.
+    return BindingsCurrent();
 }
 
 void ResetLayout() {
